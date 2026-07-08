@@ -1,13 +1,22 @@
 <!DOCTYPE html>
-   <html><head><title>Connection test</title>
-   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
-   <body style="font-family:sans-serif;text-align:center;margin-top:80px">
-     <h1 id="msg">Testing…</h1>
-     <script>
-       const sb = supabase.createClient("https://jgkgdtfutvrrylszikzf.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impna2dkdGZ1dHZycnlsc3ppa3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzk3MjYsImV4cCI6MjA5OTA1NTcyNn0.wj8-h_x5Bu6HhPOeqdnxWm89cSlKvFFx0G3KWAhCJkE");
-       sb.from('settings').select('*').then(({error}) => {
-         document.getElementById('msg').textContent =
-           error ? "Not connected: " + error.message : "Supabase connected ✅";
-       });
-     </script>
-   </body></html>
+<html><head><title>Connection test</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
+<body style="font-family:sans-serif;max-width:600px;margin:60px auto;padding:0 20px">
+  <h1 id="msg">Testing…</h1>
+  <pre id="detail" style="background:#f4f4f4;padding:12px;white-space:pre-wrap"></pre>
+  <script>
+    const URL_ = "https://jgkgdtfutvrrylszikzf.supabase.co";
+    const KEY_ = "sb_publishable_2UK0YuCiVvgJGXXdLQjfzw_9MxvIOuN";
+    const msg = document.getElementById('msg');
+    const detail = document.getElementById('detail');
+    try {
+      if (typeof supabase === 'undefined') throw new Error("The Supabase library didn't load — check internet or ad blocker.");
+      detail.textContent = "URL you entered: " + URL_ + "\nKey starts with: " + KEY_.slice(0,14) + "…";
+      const sb = supabase.createClient(URL_, KEY_);
+      sb.from('settings').select('*').then(({data, error}) => {
+        if (error) { msg.textContent = "❌ Not connected"; detail.textContent += "\n\nError: " + error.message + "  (code: " + (error.code||"?") + ")"; }
+        else { msg.textContent = "✅ Supabase connected"; detail.textContent += "\n\nRows returned: " + (data ? data.length : 0); }
+      }).catch(function(e){ msg.textContent = "❌ Error"; detail.textContent += "\n\n" + e.message; });
+    } catch(e) { msg.textContent = "❌ Setup error"; detail.textContent = e.message; }
+  </script>
+</body></html>
