@@ -4,7 +4,7 @@
    <body style="font-family:sans-serif;text-align:center;margin-top:80px">
      <h1 id="msg">Testing…</h1>
      <script>
-       const sb = supabase.createClient("https://jgkgdtfutvrrylszikzf.supabase.co", "sb_publishable_2UK0YuCiVvgJGXXdLQjfzw_9MxvIOuN");
+       const sb = supabase.createClient("https://jgkgdtfutvrrylszikzf.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Impna2dkdGZ1dHZycnlsc3ppa3pmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0Nzk3MjYsImV4cCI6MjA5OTA1NTcyNn0.wj8-h_x5Bu6HhPOeqdnxWm89cSlKvFFx0G3KWAhCJkE");
        sb.from('settings').select('*').then(({error}) => {
          document.getElementById('msg').textContent =
            error ? "Not connected: " + error.message : "Supabase connected ✅";
