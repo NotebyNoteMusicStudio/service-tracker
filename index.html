@@ -1,8 +1,13 @@
 <!DOCTYPE html>
-   <html>
-   <head><title>Hello</title></head>
+   <html><head><title>Connection test</title>
+   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
    <body style="font-family:sans-serif;text-align:center;margin-top:80px">
-     <h1>Service Tracker pipeline is live ✅</h1>
-     <p>If you can read this, GitHub and Vercel are talking to each other.</p>
-   </body>
-   </html>
+     <h1 id="msg">Testing…</h1>
+     <script>
+       const sb = supabase.createClient("https://jgkgdtfutvrrylszikzf.supabase.co", "sb_publishable_2UK0YuCiVvgJGXXdLQjfzw_9MxvIOuN");
+       sb.from('settings').select('*').then(({error}) => {
+         document.getElementById('msg').textContent =
+           error ? "Not connected: " + error.message : "Supabase connected ✅";
+       });
+     </script>
+   </body></html>
