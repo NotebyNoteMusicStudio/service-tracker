@@ -1,22 +1,981 @@
 <!DOCTYPE html>
-<html><head><title>Connection test</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script></head>
-<body style="font-family:sans-serif;max-width:600px;margin:60px auto;padding:0 20px">
-  <h1 id="msg">Testing…</h1>
-  <pre id="detail" style="background:#f4f4f4;padding:12px;white-space:pre-wrap"></pre>
-  <script>
-    const URL_ = "https://jgkgdtfutvrrylszikzf.supabase.co";
-    const KEY_ = "sb_publishable_2UK0YuCiVvgJGXXdLQjfzw_9MxvIOuN";
-    const msg = document.getElementById('msg');
-    const detail = document.getElementById('detail');
-    try {
-      if (typeof supabase === 'undefined') throw new Error("The Supabase library didn't load — check internet or ad blocker.");
-      detail.textContent = "URL you entered: " + URL_ + "\nKey starts with: " + KEY_.slice(0,14) + "…";
-      const sb = supabase.createClient(URL_, KEY_);
-      sb.from('settings').select('*').then(({data, error}) => {
-        if (error) { msg.textContent = "❌ Not connected"; detail.textContent += "\n\nError: " + error.message + "  (code: " + (error.code||"?") + ")"; }
-        else { msg.textContent = "✅ Supabase connected"; detail.textContent += "\n\nRows returned: " + (data ? data.length : 0); }
-      }).catch(function(e){ msg.textContent = "❌ Error"; detail.textContent += "\n\n" + e.message; });
-    } catch(e) { msg.textContent = "❌ Setup error"; detail.textContent = e.message; }
-  </script>
-</body></html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Service Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --navy:#1B3A5C; --teal:#9ED5C5; --cream:#F8F5F0;
+  --ink:#22303d; --muted:#6b7a88; --white:#ffffff;
+  --red:#c0574f; --amber:#d9a441; --green:#3f8f6b;
+  --radius:14px; --shadow:0 2px 10px rgba(27,58,92,.08);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',sans-serif;background:var(--cream);color:var(--ink);min-height:100vh}
+h1,h2,h3{font-family:'Playfair Display',serif;color:var(--navy)}
+button{font-family:'DM Sans',sans-serif;cursor:pointer;border:none;border-radius:10px;font-size:15px}
+input,select,textarea{font-family:'DM Sans',sans-serif;font-size:15px;padding:10px 12px;border:1.5px solid #d8dee4;border-radius:10px;background:var(--white);width:100%}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--teal);border-color:var(--teal)}
+label{display:block;font-size:13px;font-weight:500;color:var(--muted);margin:12px 0 4px}
+.btn{background:var(--navy);color:var(--white);padding:11px 20px;font-weight:500}
+.btn:hover{background:#254a72}
+.btn-teal{background:var(--teal);color:var(--navy);font-weight:700}
+.btn-ghost{background:transparent;color:var(--navy);border:1.5px solid var(--navy)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-sm{padding:6px 12px;font-size:13px}
+.card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:16px}
+.pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:12px;font-weight:700}
+.pill.scheduled{background:#e4edf5;color:var(--navy)}
+.pill.completed{background:#e0f2ea;color:var(--green)}
+.pill.canceled{background:#f6e3e1;color:var(--red)}
+.pill.rescheduled{background:#faf0dc;color:#9a742a}
+.pill.needs_reschedule{background:#fdeecd;color:#9a5f16}
+.pill.trial{background:var(--teal);color:var(--navy)}
+.grid{display:grid;gap:14px}
+.stat{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;text-align:center}
+.stat .n{font-family:'Playfair Display',serif;font-size:32px;font-weight:700;color:var(--navy)}
+.stat .l{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;padding:8px 10px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em;border-bottom:2px solid var(--cream)}
+td{padding:10px;border-bottom:1px solid var(--cream);vertical-align:middle}
+.tablewrap{overflow-x:auto}
+/* ---------- shell ---------- */
+#topbar{background:var(--navy);color:var(--white);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px}
+#topbar .brand{font-family:'Playfair Display',serif;font-size:20px;font-weight:700}
+#topbar .brand span{color:var(--teal)}
+nav{display:flex;gap:4px;flex-wrap:wrap}
+nav button{background:transparent;color:#cfdbe6;padding:8px 14px;border-radius:8px;font-size:14px}
+nav button.active,nav button:hover{background:rgba(158,213,197,.18);color:var(--teal)}
+#main{max-width:1080px;margin:0 auto;padding:24px 16px 80px}
+.pagehead{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px}
+.hidden{display:none!important}
+/* ---------- auth ---------- */
+#authView{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:linear-gradient(160deg,var(--cream) 60%,#e8f3ee)}
+.authcard{background:var(--white);border-radius:18px;box-shadow:0 8px 40px rgba(27,58,92,.14);padding:36px;width:100%;max-width:420px}
+.authcard h1{font-size:26px;margin-bottom:4px}
+.authcard .sub{color:var(--muted);font-size:14px;margin-bottom:18px}
+.authcard .btn{width:100%;margin-top:18px}
+.authlinks{margin-top:14px;text-align:center;font-size:13px}
+.authlinks a{color:var(--navy);cursor:pointer;text-decoration:underline}
+/* ---------- check-in signature ---------- */
+.checkin-btn{
+  width:170px;height:170px;border-radius:50%;margin:8px auto;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:4px;background:var(--navy);color:var(--white);
+  font-size:17px;font-weight:700;box-shadow:0 6px 24px rgba(27,58,92,.35);
+  border:5px solid var(--teal);transition:transform .12s ease;
+}
+.checkin-btn:hover{transform:scale(1.04)}
+.checkin-btn:active{transform:scale(.97)}
+.checkin-btn small{font-weight:400;font-size:12px;color:var(--teal)}
+.checkin-btn:disabled{background:#8b98a5;border-color:#c6cfd6;box-shadow:none;transform:none;cursor:default}
+@keyframes coinpop{0%{transform:translateY(0) scale(.6);opacity:1}100%{transform:translateY(-90px) scale(1.2);opacity:0}}
+.coin{position:fixed;font-size:26px;pointer-events:none;animation:coinpop .9s ease-out forwards;z-index:999}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;
+  padding:12px 22px;border-radius:99px;font-size:14px;box-shadow:0 6px 20px rgba(0,0,0,.25);z-index:998;
+  border:2px solid var(--teal)}
+/* ---------- modal ---------- */
+#modalBack{position:fixed;inset:0;background:rgba(27,58,92,.45);display:flex;align-items:center;justify-content:center;z-index:900;padding:16px}
+#modalBox{background:var(--white);border-radius:16px;max-width:480px;width:100%;padding:26px;max-height:90vh;overflow-y:auto}
+#modalBox h3{margin-bottom:8px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}
+.alertline{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;background:#fdf3e3;border-left:4px solid var(--amber);margin-bottom:8px;font-size:14px}
+.alertline.red{background:#f9e9e7;border-left-color:var(--red)}
+.subtext{font-size:13px;color:var(--muted)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:560px){.row2{grid-template-columns:1fr}}
+.leader-row{display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;margin-bottom:8px;background:var(--cream)}
+.leader-row.first{background:var(--teal);color:var(--navy)}
+.leader-rank{font-family:'Playfair Display',serif;font-size:22px;font-weight:700;width:34px;text-align:center}
+.leader-pts{margin-left:auto;font-weight:700}
+@media(prefers-reduced-motion:reduce){.coin{animation:none;display:none}.checkin-btn{transition:none}}
+</style>
+</head>
+<body>
+
+<!-- ============ AUTH ============ -->
+<div id="authView">
+  <div class="authcard">
+    <h1>Service <span style="color:#5ea892">Tracker</span></h1>
+    <div class="sub" id="authSub">Sign in to your studio</div>
+
+    <div id="loginForm">
+      <label>Email</label><input id="liEmail" type="email" autocomplete="email">
+      <label>Password</label><input id="liPass" type="password" autocomplete="current-password">
+      <button class="btn" onclick="doLogin()">Sign in</button>
+      <div class="authlinks">
+        <a onclick="showAuth('forgot')">Forgot password?</a> &nbsp;·&nbsp;
+        <a onclick="showAuth('signup')">Create account</a>
+      </div>
+    </div>
+
+    <div id="signupForm" class="hidden">
+      <label>Full name</label><input id="suName">
+      <label>Email</label><input id="suEmail" type="email">
+      <label>Password</label><input id="suPass" type="password" autocomplete="new-password">
+      <label>Invite code <span class="subtext">(from your studio owner — first account ever needs none)</span></label>
+      <input id="suCode" placeholder="e.g. a1b2c3d4">
+      <button class="btn" onclick="doSignup()">Create account</button>
+      <div class="authlinks"><a onclick="showAuth('login')">Back to sign in</a></div>
+    </div>
+
+    <div id="forgotForm" class="hidden">
+      <label>Email</label><input id="fpEmail" type="email">
+      <button class="btn" onclick="doForgot()">Send reset link</button>
+      <div class="authlinks"><a onclick="showAuth('login')">Back to sign in</a></div>
+    </div>
+
+    <div id="resetForm" class="hidden">
+      <label>New password</label><input id="rpPass" type="password" autocomplete="new-password">
+      <button class="btn" onclick="doReset()">Set new password</button>
+    </div>
+
+    <div id="authMsg" class="subtext" style="margin-top:12px"></div>
+  </div>
+</div>
+
+<!-- ============ APP SHELL ============ -->
+<div id="appView" class="hidden">
+  <div id="topbar">
+    <div class="brand">Service <span>Tracker</span></div>
+    <nav id="mainNav"></nav>
+    <button class="btn-sm btn-ghost" style="color:#cfdbe6;border-color:#cfdbe6" onclick="doLogout()">Log out</button>
+  </div>
+  <div id="main"></div>
+</div>
+
+<div id="modalBack" class="hidden"><div id="modalBox"></div></div>
+
+<script>
+/* ================= CONFIG — paste your Supabase project values ================= */
+const SUPABASE_URL = "https://jgkgdtfutvrrylszikzf.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_...your full key...";
+/* =============================================================================== */
+
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let ME = null;            // my profile row
+let SETTINGS = null;
+let TERMS = [], CLIENTS = [], PROFILES = [], SERVICES = [], REQUESTS = [], NOTIFS = [];
+let currentPage = "dashboard";
+
+/* ---------------- helpers ---------------- */
+const $ = id => document.getElementById(id);
+const esc = s => (s??"").toString().replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtDT = d => new Date(d).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'});
+const fmtD  = d => new Date(d).toLocaleDateString([], {month:'short',day:'numeric',year:'numeric'});
+const monthKey = d => { const x=new Date(d); return x.getFullYear()+"-"+String(x.getMonth()+1).padStart(2,"0"); };
+const nowMonth = () => monthKey(new Date());
+function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(), 3200); }
+function haversine(a,b,c,d){ const R=6371000,r=x=>x*Math.PI/180;
+  const dLat=r(c-a), dLng=r(d-b);
+  const h=Math.sin(dLat/2)**2 + Math.cos(r(a))*Math.cos(r(c))*Math.sin(dLng/2)**2;
+  return Math.round(2*R*Math.asin(Math.sqrt(h))); }
+const isOwner = () => ME && ME.role === 'owner';
+const workerWord = p => p.worker_type === 'contractor' ? 'contractor' : 'employee';
+const payWord = p => p.worker_type === 'contractor' ? 'invoice-ready total' : 'payroll total';
+
+/* Contractor vs employee language for tallies */
+function payLangHeading(p){
+  return p.worker_type === 'contractor'
+    ? 'Services completed (replaces your invoice — this is what you\'ll be paid on)'
+    : 'Services completed (recorded for payroll)';
+}
+
+/* ---------------- AUTH ---------------- */
+function showAuth(which){
+  ['loginForm','signupForm','forgotForm','resetForm'].forEach(f=>$(f).classList.add('hidden'));
+  $(which+'Form').classList.remove('hidden');
+  $('authSub').textContent = {login:'Sign in to your studio', signup:'Join with your invite code',
+    forgot:'We\'ll email you a reset link', reset:'Choose a new password'}[which];
+  $('authMsg').textContent = '';
+}
+async function doLogin(){
+  $('authMsg').textContent = 'Signing in…';
+  const {error} = await sb.auth.signInWithPassword({email:$('liEmail').value.trim(), password:$('liPass').value});
+  if(error){ $('authMsg').textContent = error.message; return; }
+}
+async function doSignup(){
+  const code = $('suCode').value.trim();
+  $('authMsg').textContent = 'Checking invite code…';
+  const {data:ok, error:ve} = await sb.rpc('validate_invite', {code});
+  if(ve || !ok){ $('authMsg').textContent = 'That invite code isn\'t valid. Ask your studio owner for the current one.'; return; }
+  const {error} = await sb.auth.signUp({ email:$('suEmail').value.trim(), password:$('suPass').value,
+    options:{ data:{ name: $('suName').value.trim() } } });
+  if(error){ $('authMsg').textContent = error.message; return; }
+  $('authMsg').textContent = 'Account created. Check your email to confirm, then sign in.';
+  showAuth('login');
+}
+async function doForgot(){
+  const {error} = await sb.auth.resetPasswordForEmail($('fpEmail').value.trim(), {redirectTo: location.href.split('#')[0]});
+  $('authMsg').textContent = error ? error.message : 'Reset link sent — check your email.';
+}
+async function doReset(){
+  const {error} = await sb.auth.updateUser({password: $('rpPass').value});
+  $('authMsg').textContent = error ? error.message : 'Password updated. You\'re signed in.';
+  if(!error) boot();
+}
+async function doLogout(){ await sb.auth.signOut(); location.reload(); }
+
+sb.auth.onAuthStateChange(async (event, session)=>{
+  if(event === 'PASSWORD_RECOVERY'){ $('authView').classList.remove('hidden'); $('appView').classList.add('hidden'); showAuth('reset'); return; }
+  if(session && event === 'SIGNED_IN') boot();
+});
+
+/* ---------------- BOOT + DATA ---------------- */
+async function boot(){
+  const {data:{user}} = await sb.auth.getUser();
+  if(!user) return;
+  await sb.from('profiles').update({last_login: new Date().toISOString(), email:user.email}).eq('id', user.id);
+  await loadAll(user.id);
+  $('authView').classList.add('hidden');
+  $('appView').classList.remove('hidden');
+  buildNav();
+  go(isOwner() ? 'dashboard' : 'today');
+  if(isOwner()) generateOwnerAlerts();
+}
+async function loadAll(uid){
+  const [p, s, t, c, pr, sv, rq, nf] = await Promise.all([
+    sb.from('profiles').select('*').eq('id', uid).single(),
+    sb.from('settings').select('*').eq('id',1).single(),
+    sb.from('terms').select('*').order('start_date'),
+    sb.from('clients').select('*').order('name'),
+    sb.from('profiles').select('*').order('name'),
+    sb.from('services').select('*').order('scheduled_start'),
+    sb.from('reschedule_requests').select('*').order('created_at',{ascending:false}),
+    sb.from('notifications').select('*').eq('read',false).order('created_at',{ascending:false}).limit(60),
+  ]);
+  ME = p.data; SETTINGS = s.data; TERMS = t.data||[]; CLIENTS = c.data||[];
+  PROFILES = pr.data||[]; SERVICES = sv.data||[]; REQUESTS = rq.data||[]; NOTIFS = nf.data||[];
+}
+async function refresh(){ await loadAll(ME.id); go(currentPage); }
+async function touchActivity(){
+  await sb.from('profiles').update({last_service_update:new Date().toISOString()}).eq('id', ME.id);
+}
+
+/* ---------------- NAV ---------------- */
+function buildNav(){
+  const owner = [['dashboard','Dashboard'],['schedule','Schedule'],['clients','Clients'],
+                 ['team','Specialists'],['leaderboard','Leaderboard'],['settings','Settings']];
+  const spec  = [['today','Today'],['myschedule','My Schedule'],['leaderboard','Leaderboard']];
+  $('mainNav').innerHTML = (isOwner()?owner:spec)
+    .map(([k,l])=>`<button data-p="${k}" onclick="go('${k}')">${l}</button>`).join('');
+}
+function go(page){
+  currentPage = page;
+  document.querySelectorAll('#mainNav button').forEach(b=>b.classList.toggle('active', b.dataset.p===page));
+  const fn = {dashboard:renderDashboard, schedule:renderSchedule, clients:renderClients, team:renderTeam,
+    leaderboard:renderLeaderboard, settings:renderSettings, today:renderToday, myschedule:renderMySchedule}[page];
+  if(fn) fn();
+}
+
+/* ---------------- QUOTA LOGIC ---------------- */
+function allowanceForMonth(client, mk){
+  const o = client.month_overrides || {};
+  return (mk in o) ? Number(o[mk]) : client.allowance_per_month;
+}
+function countsTowardAllowance(sv){
+  return !sv.is_trial && !sv.is_reschedule && (sv.status==='scheduled' || sv.status==='completed');
+}
+function clientMonthUsed(clientId, mk){
+  return SERVICES.filter(s=>s.client_id===clientId && monthKey(s.scheduled_start)===mk && countsTowardAllowance(s)).length;
+}
+function termFor(date){
+  const d = new Date(date).toISOString().slice(0,10);
+  return TERMS.find(t=>t.start_date<=d && d<=t.end_date) || null;
+}
+function monthsInTerm(t){
+  const out=[]; let d=new Date(t.start_date+"T00:00:00"); const end=new Date(t.end_date+"T00:00:00");
+  while(d<=end){ out.push(monthKey(d)); d=new Date(d.getFullYear(), d.getMonth()+1, 1); }
+  return out;
+}
+function clientTermNumbers(client, date){
+  const t = termFor(date); if(!t) return null;
+  const mks = monthsInTerm(t);
+  const allowed = mks.reduce((n,mk)=>n+allowanceForMonth(client,mk),0);
+  const used = SERVICES.filter(s=>s.client_id===client.id && countsTowardAllowance(s) &&
+    termFor(s.scheduled_start)?.id===t.id).length;
+  return {term:t, allowed, used, left: allowed-used};
+}
+/* Check on create: returns {ok, warn, block, msg} */
+function quotaCheck(client, dateISO, isReschedule, isTrial){
+  if(isReschedule || isTrial) return {ok:true};
+  const mk = monthKey(dateISO);
+  const monthAllowed = allowanceForMonth(client, mk);
+  const monthUsed = clientMonthUsed(client.id, mk);
+  const tn = client.term_averaging ? clientTermNumbers(client, dateISO) : null;
+  if(tn && tn.left <= 0)
+    return {ok:false, block:true, msg:`${client.name} has used all ${tn.allowed} services allowed for ${tn.term.name}. Only a reschedule can be added.`};
+  if(monthUsed >= monthAllowed){
+    if(tn) return {ok:true, warn:true, msg:`Over the monthly allowance (${monthUsed}/${monthAllowed} for this month) but within ${tn.term.name} (${tn.used}/${tn.allowed}) — averaging applies.`};
+    return {ok:false, block:true, msg:`${client.name} is at the monthly allowance (${monthUsed}/${monthAllowed}). Mark it as a reschedule if it's replacing a canceled service.`};
+  }
+  return {ok:true};
+}
+
+/* ---------------- CHECK-IN + CHA-CHING ---------------- */
+function chaChing(){
+  try{
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    [[1318.5,0],[1760,0.09]].forEach(([f,t])=>{
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type='triangle'; o.frequency.setValueAtTime(f, ctx.currentTime+t);
+      o.frequency.exponentialRampToValueAtTime(f*1.5, ctx.currentTime+t+0.18);
+      g.gain.setValueAtTime(0.001, ctx.currentTime+t);
+      g.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime+t+0.02);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime+t+0.5);
+      o.connect(g).connect(ctx.destination); o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+0.55);
+    });
+  }catch(e){}
+  for(let i=0;i<7;i++){ const c=document.createElement('div'); c.className='coin'; c.textContent='🪙';
+    c.style.left=(45+Math.random()*10)+'%'; c.style.bottom='40%'; c.style.animationDelay=(i*70)+'ms';
+    document.body.appendChild(c); setTimeout(()=>c.remove(),1200); }
+}
+function checkinWindow(sv){
+  const start = new Date(sv.scheduled_start).getTime();
+  const end = start + sv.duration_min*60000;
+  const graceEnd = end + SETTINGS.grace_period_min*60000;
+  const pointsEnd = end + SETTINGS.points_window_min*60000;
+  return {start, end, graceEnd, pointsEnd};
+}
+async function doCheckin(svId){
+  const sv = SERVICES.find(s=>s.id===svId); if(!sv) return;
+  const client = CLIENTS.find(c=>c.id===sv.client_id);
+  const w = checkinWindow(sv);
+  const now = Date.now();
+  if(now < w.start - 15*60000){ toast('A little early — check-in opens 15 minutes before the start time.'); return; }
+  if(now > w.graceEnd){
+    // still allow logging, but flagged late
+    if(!confirm('The grace period has passed, so this will be recorded as a late check-in. Log it anyway?')) return;
+  }
+  const target = SETTINGS.mode==='location'
+    ? {lat:SETTINGS.business_lat, lng:SETTINGS.business_lng, label:'the studio'}
+    : {lat:client?.lat, lng:client?.lng, label:client?.name + '\'s location'};
+
+  toast('Getting your location…');
+  navigator.geolocation.getCurrentPosition(async pos=>{
+    const {latitude:lat, longitude:lng} = pos.coords;
+    let dist = null, onSite = true;
+    if(target.lat!=null && target.lng!=null){
+      dist = haversine(lat,lng,target.lat,target.lng);
+      onSite = dist <= SETTINGS.checkin_radius_m;
+    }
+    if(!onSite && !confirm(`You look ${dist}m from ${target.label} (limit ${SETTINGS.checkin_radius_m}m). Check in anyway? It will be flagged.`)) return;
+
+    const onTime = now <= w.graceEnd;
+    const inPointsWindow = now <= w.pointsEnd;
+    openModal(`
+      <h3>How did it go?</h3>
+      <p class="subtext">A quick note is saved with this check-in.</p>
+      <label>Notes about the service</label>
+      <textarea id="ciNotes" rows="3" placeholder="e.g. Worked on scales, great progress on the recital piece"></textarea>
+      <div class="modal-actions">
+        <button class="btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-teal" onclick="finishCheckin('${svId}',${lat},${lng},${dist===null?'null':dist},${onTime},${inPointsWindow},${onSite})">Check in ✓</button>
+      </div>`);
+  }, err=>{
+    toast('Couldn\'t get your location — check that location access is allowed for this site.');
+  }, {enableHighAccuracy:true, timeout:12000});
+}
+async function finishCheckin(svId, lat, lng, dist, onTime, inPointsWindow, onSite){
+  const notes = $('ciNotes').value;
+  const {error} = await sb.from('services').update({
+    status:'completed', checkin_at:new Date().toISOString(), checkin_lat:lat, checkin_lng:lng,
+    checkin_distance_m:dist, on_time:onTime, notes, updated_at:new Date().toISOString()
+  }).eq('id', svId);
+  closeModal();
+  if(error){ toast('Something went wrong saving the check-in: '+error.message); return; }
+  await touchActivity();
+  if(inPointsWindow && onSite){
+    const pts = SETTINGS.points_per_checkin;
+    await sb.from('points_ledger').insert({specialist_id:ME.id, service_id:svId, points:pts, reason:'Checked in on time'});
+    await sb.from('profiles').update({points: (ME.points||0)+pts}).eq('id', ME.id);
+    chaChing();
+    toast(`Cha-ching! +${pts} points 🪙`);
+  } else {
+    toast('Checked in and recorded ✓');
+  }
+  await refresh();
+}
+
+/* ---------------- CANCEL / RESCHEDULE ---------------- */
+function canCancel(sv){
+  if(isOwner()) return true;
+  if(ME.perm_cancel==='yes') return true;
+  if(ME.perm_cancel==='log_only') return new Date(sv.scheduled_start) <= new Date(); // can log past ones only
+  return false;
+}
+function openCancel(svId){
+  const sv = SERVICES.find(s=>s.id===svId);
+  openModal(`
+    <h3>Cancel this service</h3>
+    <label>Who canceled?</label>
+    <select id="cxWho"><option value="client">Client</option><option value="specialist">Specialist</option><option value="business">Business</option></select>
+    <label>Reason (optional)</label>
+    <input id="cxReason" placeholder="e.g. client sick">
+    <label style="display:flex;align-items:center;gap:8px;margin-top:14px">
+      <input type="checkbox" id="cxNeeds" style="width:auto" checked> Needs to be rescheduled
+    </label>
+    <div class="modal-actions">
+      <button class="btn-ghost btn-sm" onclick="closeModal()">Back</button>
+      <button class="btn-danger" onclick="finishCancel('${svId}')">Cancel service</button>
+    </div>`);
+}
+async function finishCancel(svId){
+  const needs = $('cxNeeds').checked;
+  const {error} = await sb.from('services').update({
+    status: needs ? 'needs_reschedule' : 'canceled',
+    canceled_by: $('cxWho').value, canceled_at:new Date().toISOString(),
+    cancel_reason: $('cxReason').value, updated_at:new Date().toISOString()
+  }).eq('id', svId);
+  closeModal();
+  if(error){ toast(error.message); return; }
+  await touchActivity(); toast(needs?'Canceled — waiting to be rescheduled':'Canceled'); await refresh();
+}
+function openReschedule(svId){
+  const sv = SERVICES.find(s=>s.id===svId);
+  const full = isOwner() || ME.perm_reschedule==='full';
+  openModal(`
+    <h3>${full?'Reschedule':'Request a reschedule'}</h3>
+    <p class="subtext">${full?'The original stays in the record as “rescheduled” and a new service is created — it won\'t count against the allowance twice.':'Your request goes to the studio owner to approve and place on the calendar.'}</p>
+    <label>New date & time</label>
+    <input id="rsWhen" type="datetime-local">
+    <label>Note</label>
+    <input id="rsNote" placeholder="optional">
+    <div class="modal-actions">
+      <button class="btn-ghost btn-sm" onclick="closeModal()">Back</button>
+      <button class="btn btn-teal" onclick="${full?`finishReschedule('${svId}')`:`submitRescheduleRequest('${svId}')`}">${full?'Reschedule':'Send request'}</button>
+    </div>`);
+}
+async function finishReschedule(svId){
+  const sv = SERVICES.find(s=>s.id===svId);
+  const when = $('rsWhen').value; if(!when){ toast('Pick a new date and time'); return; }
+  const {error:e1} = await sb.from('services').insert({
+    client_id:sv.client_id, specialist_id:sv.specialist_id, scheduled_start:new Date(when).toISOString(),
+    duration_min:sv.duration_min, is_reschedule:true, reschedule_of:svId,
+    is_trial:sv.is_trial, trial_paid:sv.trial_paid, created_by:ME.id, notes:$('rsNote').value
+  });
+  if(e1){ toast(e1.message); return; }
+  await sb.from('services').update({status:'rescheduled', updated_at:new Date().toISOString()}).eq('id', svId);
+  closeModal(); await touchActivity(); toast('Rescheduled ✓'); await refresh();
+}
+async function submitRescheduleRequest(svId){
+  const when = $('rsWhen').value; if(!when){ toast('Pick a requested date and time'); return; }
+  const {error} = await sb.from('reschedule_requests').insert({
+    service_id:svId, specialist_id:ME.id, requested_start:new Date(when).toISOString(), note:$('rsNote').value
+  });
+  if(error){ toast(error.message); return; }
+  await sb.from('notifications').insert({kind:'request', message:`${ME.name} requested a reschedule`, specialist_id:null});
+  closeModal(); toast('Request sent to the studio ✓'); await refresh();
+}
+async function actOnRequest(reqId, approve){
+  const rq = REQUESTS.find(r=>r.id===reqId);
+  if(approve){
+    const sv = SERVICES.find(s=>s.id===rq.service_id);
+    await sb.from('services').insert({
+      client_id:sv.client_id, specialist_id:sv.specialist_id, scheduled_start:rq.requested_start,
+      duration_min:sv.duration_min, is_reschedule:true, reschedule_of:sv.id, created_by:ME.id, notes:rq.note
+    });
+    await sb.from('services').update({status:'rescheduled'}).eq('id', sv.id);
+  }
+  await sb.from('reschedule_requests').update({status: approve?'approved':'denied'}).eq('id', reqId);
+  toast(approve?'Approved and placed on the calendar':'Request denied'); await refresh();
+}
+
+/* ---------------- OWNER ALERTS (in-app; edge function emails) ---------------- */
+async function generateOwnerAlerts(){
+  const inserts = [];
+  const now = new Date();
+  // Overdue: scheduled services whose grace window has fully passed with no update
+  SERVICES.filter(s=>s.status==='scheduled').forEach(s=>{
+    const w = checkinWindow(s);
+    if(now.getTime() > w.graceEnd){
+      const sp = PROFILES.find(p=>p.id===s.specialist_id);
+      const cl = CLIENTS.find(c=>c.id===s.client_id);
+      const msg = `Not updated: ${cl?.name||'client'} with ${sp?.name||'specialist'} (${fmtDT(s.scheduled_start)}) — no check-in, cancel, or reschedule recorded.`;
+      if(!NOTIFS.some(n=>n.message===msg)) inserts.push({kind:'overdue', message:msg, specialist_id:null});
+    }
+  });
+  // Over allowance this month
+  CLIENTS.forEach(c=>{
+    const mk = nowMonth();
+    const used = clientMonthUsed(c.id, mk), allowed = allowanceForMonth(c, mk);
+    const tn = c.term_averaging ? clientTermNumbers(c, new Date()) : null;
+    const overTerm = tn && tn.used > tn.allowed;
+    if((used > allowed && !tn) || overTerm){
+      const msg = `${c.name} is over the allowance: ${used}/${allowed} this month${tn?` and ${tn.used}/${tn.allowed} for ${tn.term.name}`:''}.`;
+      if(!NOTIFS.some(n=>n.message===msg)) inserts.push({kind:'over_allowance', message:msg, specialist_id:null});
+    }
+  });
+  if(inserts.length){ await sb.from('notifications').insert(inserts); NOTIFS = [...inserts.map(i=>({...i,read:false})), ...NOTIFS]; }
+}
+
+/* ---------------- RENDER: OWNER DASHBOARD ---------------- */
+function studioNumbers(mk){
+  const inMonth = SERVICES.filter(s=>monthKey(s.scheduled_start)===mk);
+  return {
+    taught: inMonth.filter(s=>s.status==='completed').length,
+    canceled: inMonth.filter(s=>s.status==='canceled').length,
+    rescheduled: inMonth.filter(s=>s.status==='rescheduled').length,
+    outstanding: SERVICES.filter(s=>s.status==='needs_reschedule').length,
+    trials: inMonth.filter(s=>s.is_trial).length,
+    scheduled: inMonth.filter(s=>s.status==='scheduled').length,
+  };
+}
+function specialistNumbers(pid){
+  const mk = nowMonth();
+  const mine = SERVICES.filter(s=>s.specialist_id===pid);
+  const doneMonth = mine.filter(s=>s.status==='completed' && monthKey(s.scheduled_start)===mk).length;
+  const leftMonth = mine.filter(s=>s.status==='scheduled' && monthKey(s.scheduled_start)===mk).length;
+  const t = termFor(new Date());
+  let doneTerm=0, leftTerm=0;
+  if(t){ mine.forEach(s=>{ const tt=termFor(s.scheduled_start); if(tt && tt.id===t.id){
+    if(s.status==='completed') doneTerm++; if(s.status==='scheduled') leftTerm++; } }); }
+  return {doneMonth, leftMonth, doneTerm, leftTerm, term:t};
+}
+function renderDashboard(){
+  const n = studioNumbers(nowMonth());
+  const specs = PROFILES.filter(p=>p.role==='specialist' && p.active);
+  const pending = REQUESTS.filter(r=>r.status==='pending');
+  $('main').innerHTML = `
+  <div class="pagehead"><h2>${esc(SETTINGS.business_name)} — this month at a glance</h2>
+    <div><button class="btn-sm btn-ghost" onclick="exportServicesCSV()">Export services CSV</button>
+    <button class="btn-sm btn-ghost" onclick="exportTallyCSV()">Export specialist tally CSV</button></div></div>
+
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))">
+    <div class="stat"><div class="n">${n.taught}</div><div class="l">Taught</div></div>
+    <div class="stat"><div class="n">${n.scheduled}</div><div class="l">Upcoming</div></div>
+    <div class="stat"><div class="n">${n.canceled}</div><div class="l">Canceled</div></div>
+    <div class="stat"><div class="n">${n.rescheduled}</div><div class="l">Rescheduled</div></div>
+    <div class="stat"><div class="n" style="color:${n.outstanding? 'var(--amber)':'var(--navy)'}">${n.outstanding}</div><div class="l">Need reschedule</div></div>
+    <div class="stat"><div class="n">${n.trials}</div><div class="l">Trials</div></div>
+  </div>
+
+  ${NOTIFS.length? `<div class="card"><h3 style="margin-bottom:10px">Alerts</h3>
+    ${NOTIFS.slice(0,12).map(a=>`<div class="alertline ${a.kind==='overdue'?'red':''}"><span>⚠️</span><span>${esc(a.message)}</span>
+      ${a.id?`<button class="btn-sm btn-ghost" style="margin-left:auto" onclick="dismissNotif('${a.id}')">Dismiss</button>`:''}</div>`).join('')}
+  </div>`:''}
+
+  ${pending.length? `<div class="card"><h3 style="margin-bottom:10px">Reschedule requests</h3>
+    ${pending.map(r=>{ const sv=SERVICES.find(s=>s.id===r.service_id); const sp=PROFILES.find(p=>p.id===r.specialist_id);
+      const cl=sv?CLIENTS.find(c=>c.id===sv.client_id):null;
+      return `<div class="alertline"><span>🔁</span><span><b>${esc(sp?.name)}</b> asks to move ${esc(cl?.name||'')} from ${sv?fmtDT(sv.scheduled_start):''} to <b>${fmtDT(r.requested_start)}</b>${r.note?` — “${esc(r.note)}”`:''}</span>
+      <span style="margin-left:auto;display:flex;gap:6px"><button class="btn-sm btn-teal" onclick="actOnRequest('${r.id}',true)">Approve</button>
+      <button class="btn-sm btn-ghost" onclick="actOnRequest('${r.id}',false)">Deny</button></span></div>`; }).join('')}
+  </div>`:''}
+
+  <div class="card"><h3 style="margin-bottom:10px">Specialists at a glance</h3><div class="tablewrap"><table>
+    <tr><th>Name</th><th>Type</th><th>Done (month)</th><th>Left (month)</th><th>Done (term)</th><th>Left (term)</th><th>Points</th><th>Last login</th><th>Last update</th></tr>
+    ${specs.map(p=>{ const s=specialistNumbers(p.id);
+      const stale = !p.last_service_update || (Date.now()-new Date(p.last_service_update) > 7*864e5);
+      return `<tr><td><b>${esc(p.name||p.email)}</b></td><td>${workerWord(p)}</td>
+      <td>${s.doneMonth}</td><td>${s.leftMonth}</td><td>${s.term? s.doneTerm:'—'}</td><td>${s.term? s.leftTerm:'—'}</td>
+      <td>🪙 ${p.points||0}</td>
+      <td>${p.last_login? fmtDT(p.last_login):'never'}</td>
+      <td style="color:${stale?'var(--red)':'inherit'}">${p.last_service_update? fmtDT(p.last_service_update):'never'}</td></tr>`; }).join('')}
+  </table></div>
+  <p class="subtext" style="margin-top:8px">“Last update” turns red after 7 days with no service activity — those are your invoice-chasing candidates, except now there's no invoice to chase.</p></div>`;
+}
+async function dismissNotif(id){ await sb.from('notifications').update({read:true}).eq('id',id); NOTIFS=NOTIFS.filter(n=>n.id!==id); go(currentPage); }
+
+/* ---------------- RENDER: SCHEDULE (owner) ---------------- */
+function serviceRow(sv, forOwner){
+  const cl = CLIENTS.find(c=>c.id===sv.client_id), sp = PROFILES.find(p=>p.id===sv.specialist_id);
+  const canRs = isOwner() || ME.perm_reschedule!=='none';
+  return `<tr>
+    <td>${fmtDT(sv.scheduled_start)}<div class="subtext">${sv.duration_min} min</div></td>
+    <td><b>${esc(cl?.name||'?')}</b></td>
+    ${forOwner?`<td>${esc(sp?.name||sp?.email||'?')}</td>`:''}
+    <td><span class="pill ${sv.status}">${sv.status.replace('_',' ')}</span>
+      ${sv.is_trial?`<span class="pill trial">trial${sv.trial_paid?' · paid':' · free'}</span>`:''}
+      ${sv.is_reschedule?`<span class="pill rescheduled">makeup</span>`:''}
+      ${sv.on_time===false?`<span class="pill canceled">late check-in</span>`:''}
+      ${sv.checkin_distance_m!=null && sv.checkin_distance_m > SETTINGS.checkin_radius_m ? `<span class="pill canceled">off-site</span>`:''}</td>
+    <td class="subtext">${sv.status==='canceled'||sv.status==='needs_reschedule' ? `by ${sv.canceled_by||'?'} ${sv.canceled_at?fmtDT(sv.canceled_at):''} ${esc(sv.cancel_reason||'')}` : esc(sv.notes||'')}</td>
+    <td style="white-space:nowrap">
+      ${sv.status==='scheduled' ? `
+        ${!forOwner?`<button class="btn-sm btn-teal" onclick="doCheckin('${sv.id}')">Check in</button>`:''}
+        ${canCancel(sv)?`<button class="btn-sm btn-ghost" onclick="openCancel('${sv.id}')">Cancel</button>`:''}
+        ${canRs?`<button class="btn-sm btn-ghost" onclick="openReschedule('${sv.id}')">Reschedule</button>`:''}`:''}
+      ${sv.status==='needs_reschedule' && canRs ? `<button class="btn-sm btn-teal" onclick="openReschedule('${sv.id}')">Place makeup</button>`:''}
+    </td></tr>`;
+}
+function renderSchedule(){
+  $('main').innerHTML = `
+  <div class="pagehead"><h2>Schedule</h2>
+    <button class="btn btn-teal" onclick="openNewService()">+ Add service</button></div>
+  <div class="card">
+    <div class="row2">
+      <div><label>Filter by specialist</label><select id="fltSpec" onchange="renderScheduleTable()">
+        <option value="">All</option>${PROFILES.filter(p=>p.role==='specialist').map(p=>`<option value="${p.id}">${esc(p.name||p.email)}</option>`).join('')}</select></div>
+      <div><label>Status</label><select id="fltStatus" onchange="renderScheduleTable()">
+        <option value="">All</option><option>scheduled</option><option>completed</option><option>canceled</option><option>rescheduled</option><option>needs_reschedule</option></select></div>
+    </div>
+    <div class="tablewrap" id="schedTable" style="margin-top:14px"></div>
+  </div>`;
+  renderScheduleTable();
+}
+function renderScheduleTable(){
+  const sp = $('fltSpec')?.value, st = $('fltStatus')?.value;
+  let rows = SERVICES.slice().sort((a,b)=>new Date(b.scheduled_start)-new Date(a.scheduled_start));
+  if(sp) rows = rows.filter(s=>s.specialist_id===sp);
+  if(st) rows = rows.filter(s=>s.status===st);
+  $('schedTable').innerHTML = `<table><tr><th>When</th><th>Client</th><th>Specialist</th><th>Status</th><th>Notes / cancel trail</th><th></th></tr>
+    ${rows.map(s=>serviceRow(s,true)).join('') || '<tr><td colspan="6" class="subtext">Nothing here yet — add your first service.</td></tr>'}</table>`;
+}
+function openNewService(){
+  openModal(`
+    <h3>Add a service</h3>
+    <label>Client</label><select id="nsClient">${CLIENTS.filter(c=>c.active).map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')}</select>
+    <label>Specialist</label><select id="nsSpec">${PROFILES.filter(p=>p.active).map(p=>`<option value="${p.id}">${esc(p.name||p.email)}</option>`).join('')}</select>
+    <div class="row2">
+      <div><label>Date & time</label><input id="nsWhen" type="datetime-local"></div>
+      <div><label>Duration (min)</label><input id="nsDur" type="number" value="30"></div>
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input type="checkbox" id="nsTrial" style="width:auto"> Free-trial / trial service (extra, on top of allowance)</label>
+    <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="nsTrialPaid" style="width:auto" ${SETTINGS.trial_paid_default?'checked':''}> Trial is paid</label>
+    <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="nsResched" style="width:auto"> This is a reschedule / makeup (doesn't count against allowance)</label>
+    <div class="modal-actions"><button class="btn-ghost btn-sm" onclick="closeModal()">Back</button>
+    <button class="btn btn-teal" onclick="saveNewService()">Add service</button></div>`);
+}
+async function saveNewService(){
+  const client = CLIENTS.find(c=>c.id===$('nsClient').value);
+  const when = $('nsWhen').value; if(!when){ toast('Pick a date and time'); return; }
+  const isTrial = $('nsTrial').checked, isRs = $('nsResched').checked;
+  const q = quotaCheck(client, new Date(when).toISOString(), isRs, isTrial);
+  if(q.block){ if(!isOwner()){ toast(q.msg); return; } if(!confirm(q.msg+"\n\nOwner override — add anyway?")) return; }
+  else if(q.warn && !confirm(q.msg+"\n\nAdd it?")) return;
+  const {error} = await sb.from('services').insert({
+    client_id:client.id, specialist_id:$('nsSpec').value, scheduled_start:new Date(when).toISOString(),
+    duration_min:Number($('nsDur').value)||30, is_trial:isTrial, trial_paid:isTrial&&$('nsTrialPaid').checked,
+    is_reschedule:isRs, created_by:ME.id });
+  closeModal();
+  if(error){ toast(error.message); return; }
+  await touchActivity(); toast('Service added ✓'); await refresh();
+}
+
+/* ---------------- RENDER: CLIENTS (owner) ---------------- */
+function renderClients(){
+  $('main').innerHTML = `
+  <div class="pagehead"><h2>Clients</h2><button class="btn btn-teal" onclick="openClient()">+ Add client</button></div>
+  <div class="card"><div class="tablewrap"><table>
+    <tr><th>Name</th><th>Specialist</th><th>Allowance</th><th>This month</th><th>Term</th><th></th></tr>
+    ${CLIENTS.map(c=>{ const sp=PROFILES.find(p=>p.id===c.specialist_id);
+      const mk=nowMonth(); const used=clientMonthUsed(c.id,mk), allowed=allowanceForMonth(c,mk);
+      const tn=c.term_averaging? clientTermNumbers(c,new Date()):null;
+      return `<tr><td><b>${esc(c.name)}</b><div class="subtext">${esc(c.address||'')}</div></td>
+      <td>${esc(sp?.name||'—')}</td>
+      <td>${c.allowance_per_month}/mo${Object.keys(c.month_overrides||{}).length?` <span class="subtext">(+${Object.keys(c.month_overrides).length} overrides)</span>`:''}</td>
+      <td style="color:${used>allowed?'var(--red)':'inherit'}">${used} / ${allowed}</td>
+      <td>${tn? `${tn.used} / ${tn.allowed} <span class="subtext">${esc(tn.term.name)}</span>`:'—'}</td>
+      <td><button class="btn-sm btn-ghost" onclick="openClient('${c.id}')">Edit</button></td></tr>`; }).join('')}
+  </table></div></div>`;
+}
+function openClient(id){
+  const c = id ? CLIENTS.find(x=>x.id===id) : {name:'',address:'',lat:'',lng:'',specialist_id:'',allowance_per_month:4,month_overrides:{},term_averaging:true,active:true};
+  openModal(`
+    <h3>${id?'Edit client':'Add client'}</h3>
+    <label>Name</label><input id="clName" value="${esc(c.name)}">
+    <label>Address ${SETTINGS.mode==='mobile'?'<span class="subtext">(where the specialist checks in)</span>':''}</label>
+    <input id="clAddr" value="${esc(c.address||'')}">
+    <div class="row2">
+      <div><label>Latitude</label><input id="clLat" value="${c.lat??''}"></div>
+      <div><label>Longitude</label><input id="clLng" value="${c.lng??''}"></div>
+    </div>
+    <button class="btn-sm btn-ghost" style="margin-top:8px" onclick="geocodeClient()">Look up coordinates from address</button>
+    <label>Assigned specialist</label>
+    <select id="clSpec"><option value="">—</option>${PROFILES.filter(p=>p.active).map(p=>`<option value="${p.id}" ${c.specialist_id===p.id?'selected':''}>${esc(p.name||p.email)}</option>`).join('')}</select>
+    <div class="row2">
+      <div><label>Services allowed per month</label><input id="clAllow" type="number" value="${c.allowance_per_month}"></div>
+      <div><label style="margin-top:12px;display:flex;align-items:center;gap:8px"><input type="checkbox" id="clAvg" style="width:auto" ${c.term_averaging?'checked':''}> Average across the term</label></div>
+    </div>
+    <label>Month overrides <span class="subtext">JSON, e.g. {"2026-12": 2, "2027-05": 2}</span></label>
+    <input id="clOver" value='${esc(JSON.stringify(c.month_overrides||{}))}'>
+    ${id?`<label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input type="checkbox" id="clActive" style="width:auto" ${c.active?'checked':''}> Active</label>`:''}
+    <div class="modal-actions"><button class="btn-ghost btn-sm" onclick="closeModal()">Back</button>
+    <button class="btn btn-teal" onclick="saveClient('${id||''}')">Save</button></div>`);
+}
+async function geocodeClient(){
+  const q = $('clAddr').value.trim(); if(!q){ toast('Type the address first'); return; }
+  try{
+    const r = await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q));
+    const j = await r.json();
+    if(j[0]){ $('clLat').value=j[0].lat; $('clLng').value=j[0].lon; toast('Coordinates found ✓'); }
+    else toast('No match — you can paste coordinates from Google Maps instead.');
+  }catch(e){ toast('Lookup unavailable — paste coordinates from Google Maps.'); }
+}
+async function saveClient(id){
+  let over={}; try{ over=JSON.parse($('clOver').value||'{}'); }catch(e){ toast('Overrides must be valid JSON'); return; }
+  const row = { name:$('clName').value.trim(), address:$('clAddr').value.trim(),
+    lat: $('clLat').value?Number($('clLat').value):null, lng: $('clLng').value?Number($('clLng').value):null,
+    specialist_id: $('clSpec').value||null, allowance_per_month:Number($('clAllow').value)||0,
+    month_overrides:over, term_averaging:$('clAvg').checked };
+  if(id) row.active = $('clActive').checked;
+  const {error} = id ? await sb.from('clients').update(row).eq('id',id) : await sb.from('clients').insert(row);
+  closeModal(); if(error){ toast(error.message); return; }
+  toast('Client saved ✓'); await refresh();
+}
+
+/* ---------------- RENDER: TEAM (owner) ---------------- */
+function renderTeam(){
+  const link = location.href.split('#')[0];
+  $('main').innerHTML = `
+  <div class="pagehead"><h2>Specialists</h2></div>
+  <div class="card">
+    <h3 style="margin-bottom:6px">Invite a specialist</h3>
+    <p class="subtext">Send them this link and the invite code — they create their own login and add their availability, just like Schedule Helper.</p>
+    <div class="row2" style="margin-top:10px">
+      <div><label>Link</label><input readonly value="${esc(link)}" onclick="this.select()"></div>
+      <div><label>Invite code</label><input readonly value="${esc(SETTINGS.invite_code)}" onclick="this.select()"></div>
+    </div>
+    <button class="btn-sm btn-ghost" style="margin-top:10px" onclick="regenInvite()">Regenerate code</button>
+  </div>
+  <div class="card"><div class="tablewrap"><table>
+    <tr><th>Name</th><th>Type</th><th>Cancel</th><th>Reschedule</th><th>Edit own schedule</th><th></th></tr>
+    ${PROFILES.filter(p=>p.role==='specialist').map(p=>`<tr>
+      <td><b>${esc(p.name||p.email)}</b><div class="subtext">${esc(p.email)}</div></td>
+      <td>${workerWord(p)}</td><td>${p.perm_cancel}</td><td>${p.perm_reschedule}</td>
+      <td>${p.perm_edit_own?'yes':'no'}</td>
+      <td style="white-space:nowrap"><button class="btn-sm btn-ghost" onclick="openSpecialist('${p.id}')">Edit</button>
+      <button class="btn-sm btn-ghost" onclick="openTransfer('${p.id}')">Transfer services</button></td></tr>`).join('')}
+  </table></div></div>`;
+}
+async function regenInvite(){
+  const code = Math.random().toString(36).slice(2,10);
+  await sb.from('settings').update({invite_code:code}).eq('id',1);
+  SETTINGS.invite_code = code; toast('New invite code created'); go('team');
+}
+function openSpecialist(id){
+  const p = PROFILES.find(x=>x.id===id);
+  openModal(`
+    <h3>${esc(p.name||p.email)}</h3>
+    <label>Worker type <span class="subtext">(changes the pay language they see)</span></label>
+    <select id="spType"><option value="contractor" ${p.worker_type==='contractor'?'selected':''}>Contractor — services replace invoices</option>
+    <option value="employee" ${p.worker_type==='employee'?'selected':''}>Employee — services feed payroll</option></select>
+    <label>Cancel permission</label>
+    <select id="spCancel"><option value="yes" ${p.perm_cancel==='yes'?'selected':''}>Can cancel any of their services</option>
+    <option value="log_only" ${p.perm_cancel==='log_only'?'selected':''}>Log only — can record past cancellations, not cancel upcoming</option>
+    <option value="no" ${p.perm_cancel==='no'?'selected':''}>No — must contact the studio</option></select>
+    <label>Reschedule permission</label>
+    <select id="spResched"><option value="full" ${p.perm_reschedule==='full'?'selected':''}>Full — can create and place on the calendar</option>
+    <option value="request" ${p.perm_reschedule==='request'?'selected':''}>Request — submits a form for approval</option>
+    <option value="none" ${p.perm_reschedule==='none'?'selected':''}>None</option></select>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:12px"><input type="checkbox" id="spEdit" style="width:auto" ${p.perm_edit_own?'checked':''}> Can edit and change services on their own schedule</label>
+    <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="spActive" style="width:auto" ${p.active?'checked':''}> Active</label>
+    <div class="modal-actions"><button class="btn-ghost btn-sm" onclick="closeModal()">Back</button>
+    <button class="btn btn-teal" onclick="saveSpecialist('${id}')">Save</button></div>`);
+}
+async function saveSpecialist(id){
+  const {error} = await sb.from('profiles').update({
+    worker_type:$('spType').value, perm_cancel:$('spCancel').value,
+    perm_reschedule:$('spResched').value, perm_edit_own:$('spEdit').checked, active:$('spActive').checked
+  }).eq('id',id);
+  closeModal(); if(error){ toast(error.message); return; }
+  toast('Saved ✓'); await refresh();
+}
+function openTransfer(fromId){
+  const from = PROFILES.find(p=>p.id===fromId);
+  const movable = SERVICES.filter(s=>s.specialist_id===fromId && (s.status==='scheduled'||s.status==='needs_reschedule'));
+  openModal(`
+    <h3>Transfer services from ${esc(from.name||from.email)}</h3>
+    <p class="subtext">Moves outstanding and upcoming services to another specialist — for mid-year teacher switches.</p>
+    <label>Transfer to</label>
+    <select id="trTo">${PROFILES.filter(p=>p.role==='specialist'&&p.id!==fromId&&p.active).map(p=>`<option value="${p.id}">${esc(p.name||p.email)}</option>`).join('')}</select>
+    <label>Select services</label>
+    <div style="max-height:220px;overflow-y:auto">
+    ${movable.map(s=>{ const cl=CLIENTS.find(c=>c.id===s.client_id);
+      return `<label style="display:flex;gap:8px;align-items:center;font-size:14px;margin:6px 0;color:var(--ink)">
+      <input type="checkbox" class="trPick" value="${s.id}" style="width:auto" checked>
+      ${esc(cl?.name)} — ${fmtDT(s.scheduled_start)} <span class="pill ${s.status}">${s.status.replace('_',' ')}</span></label>`; }).join('') || '<p class="subtext">No outstanding or upcoming services.</p>'}
+    </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px"><input type="checkbox" id="trClients" style="width:auto" checked> Also reassign these clients to the new specialist</label>
+    <div class="modal-actions"><button class="btn-ghost btn-sm" onclick="closeModal()">Back</button>
+    <button class="btn btn-teal" onclick="doTransfer('${fromId}')">Transfer</button></div>`);
+}
+async function doTransfer(fromId){
+  const toId = $('trTo').value;
+  const ids = [...document.querySelectorAll('.trPick:checked')].map(x=>x.value);
+  if(!ids.length){ toast('Pick at least one service'); return; }
+  const {error} = await sb.from('services').update({specialist_id:toId, updated_at:new Date().toISOString()}).in('id', ids);
+  if(error){ toast(error.message); return; }
+  if($('trClients').checked){
+    const clientIds = [...new Set(SERVICES.filter(s=>ids.includes(s.id)).map(s=>s.client_id))];
+    await sb.from('clients').update({specialist_id:toId}).in('id', clientIds);
+  }
+  const to = PROFILES.find(p=>p.id===toId);
+  await sb.from('notifications').insert({kind:'transfer', message:`${ids.length} service(s) were transferred to you.`, specialist_id:toId});
+  closeModal(); toast(`Transferred ${ids.length} service(s) to ${to.name||to.email} ✓`); await refresh();
+}
+
+/* ---------------- RENDER: SETTINGS (owner) ---------------- */
+function renderSettings(){
+  const s = SETTINGS;
+  $('main').innerHTML = `
+  <div class="pagehead"><h2>Settings</h2></div>
+  <div class="card">
+    <h3>Business</h3>
+    <label>Business name</label><input id="stName" value="${esc(s.business_name)}">
+    <label>Mode</label>
+    <select id="stMode">
+      <option value="mobile" ${s.mode==='mobile'?'selected':''}>Mobile / traveling — specialists check in at each client's address</option>
+      <option value="location" ${s.mode==='location'?'selected':''}>Location — everyone checks in at the business address</option>
+    </select>
+    <div id="bizLoc" class="${s.mode==='location'?'':'hidden'}">
+      <label>Business address</label><input id="stAddr" value="${esc(s.business_address||'')}">
+      <div class="row2"><div><label>Latitude</label><input id="stLat" value="${s.business_lat??''}"></div>
+      <div><label>Longitude</label><input id="stLng" value="${s.business_lng??''}"></div></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Check-in rules</h3>
+    <div class="row2">
+      <div><label>Check-in radius (meters)</label><input id="stRadius" type="number" value="${s.checkin_radius_m}"></div>
+      <div><label>Grace period after end (minutes)</label><input id="stGrace" type="number" value="${s.grace_period_min}"></div>
+      <div><label>“Cha-ching” window after end (minutes)</label><input id="stPtsWin" type="number" value="${s.points_window_min}"></div>
+      <div><label>Points per on-time check-in</label><input id="stPts" type="number" value="${s.points_per_checkin}"></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Reminders & deadlines</h3>
+    <div class="row2">
+      <div><label>First reminder after (hours un-updated)</label><input id="stRem1" type="number" value="${s.reminder_after_hours}"></div>
+      <div><label>Repeat reminder every (hours)</label><input id="stRem2" type="number" value="${s.reminder_repeat_hours}"></div>
+      <div><label>Payroll update deadline (day of month)</label><input id="stPayday" type="number" min="1" max="28" value="${s.payroll_deadline_day}"></div>
+      <div><label style="margin-top:26px;display:flex;align-items:center;gap:8px"><input type="checkbox" id="stTrialPaid" style="width:auto" ${s.trial_paid_default?'checked':''}> Trials are paid by default</label></div>
+    </div>
+    <p class="subtext" style="margin-top:8px">Email reminders are sent by the scheduled function (see the setup guide) using these values. In-app alerts appear on the dashboard either way.</p>
+  </div>
+  <div class="card">
+    <h3>Terms (for averaging — semesters, years, custom)</h3>
+    ${TERMS.map(t=>`<div class="alertline" style="background:var(--cream);border-left-color:var(--teal)">
+      <b>${esc(t.name)}</b>&nbsp;${fmtD(t.start_date)} → ${fmtD(t.end_date)}
+      <button class="btn-sm btn-ghost" style="margin-left:auto" onclick="delTerm('${t.id}')">Delete</button></div>`).join('') || '<p class="subtext">No terms yet — monthly caps apply strictly until you add one.</p>'}
+    <div class="row2" style="margin-top:10px">
+      <div><label>Name</label><input id="tmName" placeholder="Spring semester"></div>
+      <div><label>Start</label><input id="tmStart" type="date"></div>
+      <div><label>End</label><input id="tmEnd" type="date"></div>
+    </div>
+    <button class="btn-sm btn-teal" style="margin-top:10px" onclick="addTerm()">Add term</button>
+  </div>
+  <button class="btn btn-teal" onclick="saveSettings()">Save all settings</button>`;
+  $('stMode').addEventListener('change', e=>$('bizLoc').classList.toggle('hidden', e.target.value!=='location'));
+}
+async function saveSettings(){
+  const {error} = await sb.from('settings').update({
+    business_name:$('stName').value, mode:$('stMode').value,
+    business_address:$('stAddr')?.value||SETTINGS.business_address,
+    business_lat: $('stLat')?.value?Number($('stLat').value):SETTINGS.business_lat,
+    business_lng: $('stLng')?.value?Number($('stLng').value):SETTINGS.business_lng,
+    checkin_radius_m:Number($('stRadius').value), grace_period_min:Number($('stGrace').value),
+    points_window_min:Number($('stPtsWin').value), points_per_checkin:Number($('stPts').value),
+    reminder_after_hours:Number($('stRem1').value), reminder_repeat_hours:Number($('stRem2').value),
+    payroll_deadline_day:Number($('stPayday').value), trial_paid_default:$('stTrialPaid').checked,
+    updated_at:new Date().toISOString()
+  }).eq('id',1);
+  if(error){ toast(error.message); return; }
+  toast('Settings saved ✓'); await refresh();
+}
+async function addTerm(){
+  if(!$('tmName').value||!$('tmStart').value||!$('tmEnd').value){ toast('Fill in name, start, and end'); return; }
+  await sb.from('terms').insert({name:$('tmName').value, start_date:$('tmStart').value, end_date:$('tmEnd').value});
+  toast('Term added ✓'); await refresh();
+}
+async function delTerm(id){ if(confirm('Delete this term?')){ await sb.from('terms').delete().eq('id',id); await refresh(); } }
+
+/* ---------------- RENDER: SPECIALIST — TODAY ---------------- */
+function renderToday(){
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today.getTime()+864e5);
+  const mine = SERVICES.filter(s=>s.specialist_id===ME.id);
+  const todays = mine.filter(s=>{ const d=new Date(s.scheduled_start); return d>=today && d<tomorrow && s.status==='scheduled'; });
+  const s = specialistNumbers(ME.id);
+  const myNotifs = NOTIFS.filter(n=>n.specialist_id===ME.id);
+  $('main').innerHTML = `
+  <div class="pagehead"><h2>Hi, ${esc((ME.name||'').split(' ')[0]||'there')} 👋</h2></div>
+  ${myNotifs.length?`<div class="card">${myNotifs.map(n=>`<div class="alertline"><span>🔔</span><span>${esc(n.message)}</span>
+    <button class="btn-sm btn-ghost" style="margin-left:auto" onclick="dismissNotif('${n.id}')">Got it</button></div>`).join('')}</div>`:''}
+  <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr))">
+    <div class="stat"><div class="n">${s.doneMonth}</div><div class="l">Done this month</div></div>
+    <div class="stat"><div class="n">${s.leftMonth}</div><div class="l">Left this month</div></div>
+    ${s.term?`<div class="stat"><div class="n">${s.leftTerm}</div><div class="l">Left this ${esc(s.term.name)}</div></div>`:''}
+    <div class="stat"><div class="n">🪙 ${ME.points||0}</div><div class="l">Points</div></div>
+  </div>
+  <div class="card" style="text-align:center">
+    <h3>${payLangHeading(ME)}</h3>
+    ${todays.length ? todays.map(sv=>{ const cl=CLIENTS.find(c=>c.id===sv.client_id);
+      return `<div style="margin:18px 0">
+        <div style="font-size:18px"><b>${esc(cl?.name)}</b> · ${fmtDT(sv.scheduled_start)} · ${sv.duration_min} min</div>
+        <div class="subtext">${esc(cl?.address||'')}</div>
+        <button class="checkin-btn" onclick="doCheckin('${sv.id}')">Tap to<br>check in<small>right when you finish 🪙</small></button>
+        <div>
+          ${canCancel(sv)?`<button class="btn-sm btn-ghost" onclick="openCancel('${sv.id}')">Cancel</button>`:''}
+          ${ME.perm_reschedule!=='none'?`<button class="btn-sm btn-ghost" onclick="openReschedule('${sv.id}')">Reschedule</button>`:''}
+        </div></div>`; }).join('')
+    : '<p class="subtext" style="margin:16px 0">Nothing scheduled today. Enjoy the quiet ✨</p>'}
+  </div>`;
+}
+
+/* ---------------- RENDER: SPECIALIST — MY SCHEDULE ---------------- */
+function renderMySchedule(){
+  const mine = SERVICES.filter(s=>s.specialist_id===ME.id).sort((a,b)=>new Date(b.scheduled_start)-new Date(a.scheduled_start));
+  $('main').innerHTML = `
+  <div class="pagehead"><h2>My schedule</h2>
+    ${ME.perm_edit_own?`<button class="btn btn-teal" onclick="openNewService()">+ Add service</button>`:''}</div>
+  <div class="card"><p class="subtext" style="margin-bottom:10px">${payLangHeading(ME)} — no more invoices to remember. Check in and you're done.</p>
+  <div class="tablewrap"><table><tr><th>When</th><th>Client</th><th>Status</th><th>Notes</th><th></th></tr>
+    ${mine.map(s=>serviceRow(s,false)).join('') || '<tr><td colspan="5" class="subtext">No services yet.</td></tr>'}</table></div></div>`;
+}
+
+/* ---------------- RENDER: LEADERBOARD ---------------- */
+function renderLeaderboard(){
+  const rows = PROFILES.filter(p=>p.role==='specialist'&&p.active).sort((a,b)=>(b.points||0)-(a.points||0));
+  $('main').innerHTML = `
+  <div class="pagehead"><h2>Leaderboard</h2></div>
+  <div class="card">
+    <p class="subtext" style="margin-bottom:14px">Points for checking in right when a service ends. Friendly bragging rights only — but the cha-ching is real.</p>
+    ${rows.map((p,i)=>`<div class="leader-row ${i===0?'first':''}">
+      <div class="leader-rank">${i+1}</div><div><b>${esc(p.name||p.email)}</b></div>
+      <div class="leader-pts">🪙 ${p.points||0}</div></div>`).join('') || '<p class="subtext">No specialists yet.</p>'}
+  </div>`;
+}
+
+/* ---------------- EXPORTS ---------------- */
+function downloadCSV(name, rows){
+  const csv = rows.map(r=>r.map(v=>`"${String(v??'').replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv],{type:'text/csv'})); a.download = name; a.click();
+}
+function exportServicesCSV(){
+  const rows = [['Date','Client','Specialist','Status','Trial','Trial paid','Reschedule','Checked in at','On time','Distance (m)','Canceled by','Canceled at','Reason','Notes']];
+  SERVICES.forEach(s=>{ const cl=CLIENTS.find(c=>c.id===s.client_id), sp=PROFILES.find(p=>p.id===s.specialist_id);
+    rows.push([new Date(s.scheduled_start).toLocaleString(), cl?.name, sp?.name||sp?.email, s.status,
+      s.is_trial?'yes':'', s.is_trial?(s.trial_paid?'paid':'free'):'', s.is_reschedule?'yes':'',
+      s.checkin_at?new Date(s.checkin_at).toLocaleString():'', s.on_time===false?'LATE':(s.on_time?'yes':''),
+      s.checkin_distance_m??'', s.canceled_by??'', s.canceled_at?new Date(s.canceled_at).toLocaleString():'', s.cancel_reason, s.notes]); });
+  downloadCSV('services.csv', rows);
+}
+function exportTallyCSV(){
+  const mk = nowMonth();
+  const rows = [['Specialist','Type','Completed this month','Left this month','Completed this term','Left this term','Points','Last login','Last update']];
+  PROFILES.filter(p=>p.role==='specialist').forEach(p=>{ const s=specialistNumbers(p.id);
+    rows.push([p.name||p.email, p.worker_type, s.doneMonth, s.leftMonth, s.term?s.doneTerm:'', s.term?s.leftTerm:'',
+      p.points||0, p.last_login?new Date(p.last_login).toLocaleString():'', p.last_service_update?new Date(p.last_service_update).toLocaleString():'']); });
+  downloadCSV('specialist-tally-'+mk+'.csv', rows);
+}
+
+/* ---------------- MODAL ---------------- */
+function openModal(html){ $('modalBox').innerHTML = html; $('modalBack').classList.remove('hidden'); }
+function closeModal(){ $('modalBack').classList.add('hidden'); }
+$('modalBack').addEventListener('click', e=>{ if(e.target.id==='modalBack') closeModal(); });
+
+/* ---------------- start ---------------- */
+(async ()=>{
+  const {data:{session}} = await sb.auth.getSession();
+  if(session) boot(); else showAuth('login');
+})();
+</script>
+</body>
+</html>
